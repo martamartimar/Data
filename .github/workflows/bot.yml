@@ -1,0 +1,33 @@
+name: Parking Data Scraper
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout del código
+      uses: actions/checkout@v3
+
+    - name: Configurar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Instalar librerías
+      run: |
+        pip install requests pandas
+
+    - name: Ejecutar el script recolector
+      run: python scraper.py
+
+    - name: Guardar cambios en GitHub
+      run: |
+        git config --global user.name "ParkingBot"
+        git config --global user.email "bot@github.com"
+        git add historico_parking.csv
+        git commit -m "Automatizado: Actualización de datos de parking" || exit 0
+        git push
