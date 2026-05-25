@@ -4,32 +4,37 @@ import os
 from datetime import datetime
 import sys
 
-URL_API = "https://valencia.opendatasoft.com/api/explore/v2.1/catalog/datasets/parkings/records?limit=100"
+URL_API = "https://geoportal.valencia.es/server/rest/services/OPENDATA/Trafico/MapServer/194/query?where=1=1&outFields=*&f=json"
 
 try:
-    response = requests.get(URL_API)
-    response.raise_for_status() # Si la web del ayuntamiento cae, esto hace saltar la alarma
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    response = requests.get(URL_API, headers=headers, timeout=10)
+    response.raise_for_status() 
     
     data = response.json()
-    records = data.get('results', [])
     
-    # Si la web responde pero no hay datos, paramos el robot
-    if len(records) == 0:
-        print("Error: El Ayuntamiento no ha devuelto ningún parking.")
+    # En ArcGIS, los datos vienen dentro de una lista llamada 'features'
+    features = data.get('features', [])
+    
+    if len(features) == 0:
+        print("Error: El servidor del Ayuntamiento no ha devuelto datos.")
         sys.exit(1)
     
     extracted_data = []
     fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    for record in records:
+    for feature in features:
+        # Los valores están dentro de 'attributes' y las coordenadas en 'geometry'
+        attributes = feature.get('attributes', {})
+        geometry = feature.get('geometry', {})
+        
         extracted_data.append({
             "fecha_registro": fecha_actual,
-            "nombre": record.get("nombre", "Desconocido"),
-            # Buscamos las columnas por varios nombres por si el Ayuntamiento los cambia
-            "plazas_libres": record.get("plazaslibres", record.get("plazas_libres", "")),
-            "capacidad": record.get("plazastotales", record.get("plazas_totales", "")),
-            "latitud": record.get("geo_point_2d", {}).get("lat") if record.get("geo_point_2d") else "",
-            "longitud": record.get("geo_point_2d", {}).get("lon") if record.get("geo_point_2d") else ""
+            "nombre": attributes.get("nombre", attributes.get("NOMBRE", "Desconocido")),
+            "plazas_libres": attributes.get("plazaslibres", attributes.get("PLAZASLIBRES", 0)),
+            "capacidad": attributes.get("plazastotales", attributes.get("PLAZASTOTALES", 0)),
+            "longitud": geometry.get("x", 0),
+            "latitud": geometry.get("y", 0)
         })
         
     df_nuevo = pd.DataFrame(extracted_data)
@@ -40,8 +45,8 @@ try:
     else:
         df_nuevo.to_csv(csv_filename, index=False)
         
-    print(f"¡Éxito! Se han guardado {len(records)} parkings en el Excel.")
+    print(f"¡Éxito absoluto! Guardados {len(features)} parkings desde el Geoportal oficial.")
 
 except Exception as e:
     print(f"Error crítico en Python: {e}")
-    sys.exit(1) # Esto le avisa a GitHub de que detenga todo
+    sys.exit(1)
