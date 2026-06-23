@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+requests
+geopy
+scikit-learn
+pydeck
+matplotlib
+seaborn
